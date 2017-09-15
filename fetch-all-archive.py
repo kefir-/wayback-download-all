@@ -3,6 +3,7 @@ import requests
 import sys
 import os
 import urllib
+import time
 from collections import namedtuple
 
 baseurl="http://web.archive.org/cdx/search/xd?url="
@@ -14,7 +15,8 @@ def help():
 
 
 def setup():
-    os.makedirs(basedir)
+    if not os.path.exists(basedir):
+        os.makedirs(basedir)
 
 
 def to_fs(s):
@@ -29,12 +31,25 @@ def download(entry):
         return
 
     output = os.path.join(basedir, ts, to_fs(url))
+    if os.path.exists(output):
+        print("Skipping url, already downloaded:", url)
+        return
 
     print("Fetching url {0}@{1} => {2}".format(url, ts, output))
-    r = requests.get("http://web.archive.org/web/{0}id_/{1}".format(ts,entry.url))
-    if r.status_code != 200:
-        print("Error: archive.org returned error when downloading:", r.status_code)
-        sys.exit(1)
+    counter = 10
+    while True:
+        counter = counter - 1
+        r = requests.get("http://web.archive.org/web/{0}id_/{1}".format(ts,entry.url))
+        if r.status_code == 200:
+            break
+        else:
+            if counter > 0:
+                print("Warning: Got http error from archive.org, sleeping a bit:", r.status_code)
+                time.sleep((10-counter) * 10)
+                continue
+            else:
+                print("Error: archive.org returned error when downloading:", r.status_code)
+                sys.exit(1)
 
     if not os.path.exists(os.path.dirname(output)):
         os.makedirs(os.path.dirname(output))
